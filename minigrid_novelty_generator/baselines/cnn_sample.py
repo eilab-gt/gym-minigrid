@@ -3,6 +3,8 @@ from datetime import datetime
 import torch as th
 from torch import nn
 import gym
+import sys
+sys.path.append(r"C:\Users\Mustafa\code\gym-minigrid")
 import gym_minigrid
 import argparse
 
@@ -12,6 +14,9 @@ from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
+import wandb
+
+from wandb.integration.sb3 import WandbCallback
 
 
 
@@ -66,11 +71,20 @@ class MinigridCNN(BaseFeaturesExtractor):
  
 def main(args):
     config = {
-        "total_timesteps": 100000000,
+        "total_timesteps": 10000000,
         "env_name": "MiniGrid-DoorKey-6x6-v0",
     }
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
+
+    run = wandb.init(
+        project="sb3_minigrid",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+    )
+
      
     def make_env():
         env = gym.make(config["env_name"])
@@ -81,6 +95,7 @@ def main(args):
      
      
     env = DummyVecEnv([make_env])
+    #print(env.observation_space.shape)
     
     eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=str('logs/'+args.saves_logs+'_'+dt_string),
                                  log_path=str('logs/'+args.saves_logs+'_'+dt_string), eval_freq=1000,
@@ -93,12 +108,24 @@ def main(args):
 
     if args.load:
         print(f'loading model{args.load}')
-        model = PPO.load(args.load)
+        # model_1 = PPO.load(args.load)
+        # params = model_1.get_parameters()
+        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs))
+        model.set_parameters("models/best_model.zip")
     else:
         model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs))
     
     for exp in range(args.num_exp):
-        model.learn(total_timesteps=args.total_timesteps,tb_log_name='run_{}'.format(exp),callback=eval_callback)
+        model.learn(
+            total_timesteps=args.total_timesteps, 
+            tb_log_name='run_{}'.format(exp), 
+            callback=WandbCallback(
+            gradient_save_freq=1000,
+            model_save_path=f"models/mustafa_cnn/preloaded_params/{run.id}",
+            model_save_freq = 20,
+            verbose=2,
+        ),)
+    run.finish()
 
 
 if __name__ == "__main__":

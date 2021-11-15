@@ -6,7 +6,7 @@ class DoorKeyEnv(MiniGridEnv):
     Environment with a door and key, sparse reward
     """
 
-    def __init__(self, size=8, second=False):
+    def __init__(self, size=8, second=True):
         self.second = second
         super().__init__(
             grid_size=size,
@@ -42,13 +42,11 @@ class DoorKeyEnv(MiniGridEnv):
             size=(splitIdx, height)
         )
 
-        if self.second:
-            # Place a blue key on the left side
-            self.place_obj(
-                obj=Key('blue'),
-                top=(0, 0),
-                size=(splitIdx, height)
-            )
+        # self.place_obj(
+        #     obj=Key('blue'),
+        #     top=(0,0),
+        #     size=(splitIdx, height)
+        # )
         self.mission = "use the key to open the door and then get to the goal"
 
 class DoorKeyEnv5x5(DoorKeyEnv):
