@@ -4,7 +4,7 @@ import torch as th
 from torch import nn
 import gym
 import sys
-sys.path.append(r"C:\Users\Mustafa\code\gym-minigrid")
+sys.path.append(r"/home/ei-lab/code/sailon/gym-minigrid")
 import gym_minigrid
 import argparse
 
@@ -110,10 +110,10 @@ def main(args):
         print(f'loading model{args.load}')
         # model_1 = PPO.load(args.load)
         # params = model_1.get_parameters()
-        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs))
+        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs), device='cuda')
         model.set_parameters("models/best_model.zip")
     else:
-        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs))
+        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs), device='cuda')
     
     for exp in range(args.num_exp):
         model.learn(
