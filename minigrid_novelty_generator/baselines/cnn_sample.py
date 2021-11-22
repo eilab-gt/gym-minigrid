@@ -18,7 +18,7 @@ from stable_baselines3.common.callbacks import EvalCallback
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', type=str, default='')
-    parser.add_argument('-t','--total_timesteps', type=int, default=2500000)
+    parser.add_argument('-t','--total_timesteps', type=int, default=500000)
     parser.add_argument('-e', '--env', type=str, default='MiniGrid-DoorKey-6x6-v0') 
     parser.add_argument('-s', '--saves_logs', type=str, default='minigrid_cnn_logs')
     parser.add_argument('--num_exp', type=int, default=1)
@@ -65,6 +65,8 @@ class MinigridCNN(BaseFeaturesExtractor):
  
  
 def main(args):
+    
+
     config = {
         "total_timesteps": 100000000,
         "env_name": "MiniGrid-DoorKey-6x6-v0",
@@ -72,18 +74,21 @@ def main(args):
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
      
+    log_dir='logs/'+args.saves_logs+'_'+dt_string
+    
     def make_env():
         env = gym.make(config["env_name"])
         env = gym_minigrid.wrappers.ImgObsWrapper(env)
-        env = Monitor(env)
+        env = Monitor(env, log_dir)
         obs = env.reset()
         return env
      
-     
+    # env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
+ 
     env = DummyVecEnv([make_env])
     
-    eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=str('logs/'+args.saves_logs+'_'+dt_string),
-                                 log_path=str('logs/'+args.saves_logs+'_'+dt_string), eval_freq=1000,
+    eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=log_dir,
+                                 log_path=log_dir, eval_freq=10000,
                                  deterministic=True, render=False)
     
     policy_kwargs = dict(
@@ -95,10 +100,11 @@ def main(args):
         print(f'loading model{args.load}')
         model = PPO.load(args.load)
     else:
-        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=str(args.saves_logs))
+        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=log_dir)
     
     for exp in range(args.num_exp):
         model.learn(total_timesteps=args.total_timesteps,tb_log_name='run_{}'.format(exp),callback=eval_callback)
+        model.save(log_dir+'/'+'run_{}'+'_final_model')
 
 
 if __name__ == "__main__":

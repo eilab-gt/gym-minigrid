@@ -1,3 +1,5 @@
+minigrid_novelty_generator/baselines/logs/*
+minigrid_novelty_generator/baselines/minigrid_cnn_logs/*
 *.pyc
 *__pycache__
 *egg-info
