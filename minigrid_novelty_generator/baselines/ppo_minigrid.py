@@ -1,7 +1,8 @@
 import gym
 import stable_baselines3.common.evaluation
 from minigrid_novelty_generator.utils.parser import getparser
-
+import sys
+sys.path.append(r"C:\Users\Mustafa\code\gym-minigrid")
 import gym_minigrid
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor

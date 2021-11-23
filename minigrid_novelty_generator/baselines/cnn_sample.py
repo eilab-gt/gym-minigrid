@@ -3,6 +3,7 @@ from datetime import datetime
 import torch as th
 from torch import nn
 import gym
+import sys
 import gym_minigrid
 import argparse
 
@@ -11,13 +12,16 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback, CallbackList
+import wandb
+
+from wandb.integration.sb3 import WandbCallback
 
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--load', type=str, default='')
+    parser.add_argument('--load', type=str, default='models/best_model.zip')
     parser.add_argument('-t','--total_timesteps', type=int, default=500000)
     parser.add_argument('-e', '--env', type=str, default='MiniGrid-DoorKey-6x6-v0') 
     parser.add_argument('-s', '--saves_logs', type=str, default='minigrid_cnn_logs')
@@ -64,47 +68,79 @@ class MinigridCNN(BaseFeaturesExtractor):
         return self.linear(self.cnn(observations))
  
  
-def main(args):
-    
+def make_env(config):
+    env = gym.make(config["env_name"])
+    env = gym_minigrid.wrappers.ImgObsWrapper(env)
+    env = Monitor(env, log_dir)
+    obs = env.reset()
+    return env
 
+     
+def main(args):
+  
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     config = {
-        "total_timesteps": 100000000,
+        "total_timesteps": 10000000,
         "env_name": "MiniGrid-DoorKey-6x6-v0",
     }
     now = datetime.now()
     dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
+
+    run = wandb.init(
+        project="sb3_minigrid",
+        config=config,
+        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        monitor_gym=True,  # auto-upload the videos of agents playing the game
+        save_code=True,  # optional
+    )
+
      
-    log_dir='logs/'+args.saves_logs+'_'+dt_string
+    log_dir = 'logs/'+args.saves_logs+'_'+dt_string
     
-    def make_env():
-        env = gym.make(config["env_name"])
-        env = gym_minigrid.wrappers.ImgObsWrapper(env)
-        env = Monitor(env, log_dir)
-        obs = env.reset()
-        return env
-     
+    wandb_log = 'logs/wandb/'+args.saves_logs+'_'+dt_string
     # env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
  
-    env = DummyVecEnv([make_env])
+    env = DummyVecEnv([make_env(config)])
+    #print(env.observation_space.shape)
     
     eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=log_dir,
                                  log_path=log_dir, eval_freq=10000,
                                  deterministic=True, render=False)
     
+    tracking_callback = WandbCallback(
+        gradient_save_freq=1000,
+        model_save_path=wandb_log,
+        model_save_freq = 20,
+        verbose=2)
+
+    all_callback = CallbackList([tracking_callback, eval_callback])
+
     policy_kwargs = dict(
         features_extractor_class=MinigridCNN,
         features_extractor_kwargs=dict(features_dim=128),
         )
 
+    model = PPO("CnnPolicy", 
+                env, 
+                policy_kwargs=policy_kwargs, 
+                verbose=1, 
+                tensorboard_log=str(args.saves_logs), 
+                device=device)
+
     if args.load:
         print(f'loading model{args.load}')
-        model = PPO.load(args.load)
-    else:
-        model = PPO("CnnPolicy", env, policy_kwargs=policy_kwargs, verbose=1,tensorboard_log=log_dir)
+        # params = model_1.get_parameters()
+        model.set_parameters(args.load)
     
     for exp in range(args.num_exp):
-        model.learn(total_timesteps=args.total_timesteps,tb_log_name='run_{}'.format(exp),callback=eval_callback)
-        model.save(log_dir+'/'+'run_{}'+'_final_model')
+        model.learn(
+            total_timesteps=args.total_timesteps, 
+            tb_log_name='run_{}'.format(exp), 
+            all_callback,
+        )
+        model.save(log_dir+'/'+'run_{}'.format(exp)+'_final_model')
+    run.finish()
 
 
 if __name__ == "__main__":
