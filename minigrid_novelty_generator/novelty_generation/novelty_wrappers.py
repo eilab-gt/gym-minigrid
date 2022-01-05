@@ -3,6 +3,9 @@
 import abc
 import gym
 
+from .novelty_objs import ColorDoor
+from gym_minigrid.minigrid import Key, Grid, Door, Goal, COLORS
+
 
 class NoveltyWrapper(gym.core.Wrapper):
     """
@@ -20,7 +23,7 @@ class NoveltyWrapper(gym.core.Wrapper):
         self.num_episodes = 0
 
     def reset(self, **kwargs):
-        self.num_episodes += 0
+        self.num_episodes += 1
         if self.num_episodes >= self.novelty_episode:
             return self._post_novelty_reset(**kwargs)
         else:
@@ -57,7 +60,105 @@ class NoveltyWrapper(gym.core.Wrapper):
     # @abc.abstractmethod
     def _post_novelty_gen_grid(self, width, height):
         """
-        This is the main function where you implement he novelty
+        This is the main function where you implement the novelty
         """
         raise NotImplementedError
+
+
+class Door2KeyNoveltyWrapper(NoveltyWrapper):
+
+    def _rand_int(self, low, high):
+        return self.env.np_random.randint(low, high)
+
+    def _post_novelty_gen_grid(self, width, height):
+        # Create an empty grid
+        self.env.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        self.env.grid.wall_rect(0, 0, width, height)
+
+        # Place a goal in the bottom-right corner
+        self.env.put_obj(Goal(), width - 2, height - 2)
+
+        # Create a vertical splitting wall
+        splitIdx = self._rand_int(2, width - 2)
+        self.env.grid.vert_wall(splitIdx, 0)
+
+        # Place the agent at a random position and orientation
+        # on the left side of the splitting wall
+        self.env.place_agent(size=(splitIdx, height))
+        self.agent_pos = self.env.agent_pos
+        self.agent_dir = self.env.agent_dir
+
+        # Place a door in the wall
+        doorIdx = self._rand_int(1, width - 2)
+        self.env.put_obj(
+            ColorDoor('yellow', is_locked=True, key_color='blue'),
+            splitIdx,
+            doorIdx
+        )
+
+        # Place a yellow key on the left side
+        self.env.place_obj(
+            obj=Key('yellow'),
+            top=(0, 0),
+            size=(splitIdx, height)
+        )
+        if self.env.second:
+            self.place_obj(
+                obj=Key('blue'),
+                top=(0, 0),
+                size=(splitIdx, height)
+            )
+        self.env.mission = "use the key to open the door and then get to the goal"
+
+
+class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
+
+    def _rand_int(self, low, high):
+        return self.env.np_random.randint(low, high)
+
+    def _post_novelty_gen_grid(self, width, height):
+        # Create an empty grid
+        self.env.grid = Grid(width, height)
+
+        # Generate the surrounding walls
+        self.env.grid.wall_rect(0, 0, width, height)
+
+        # Place a goal in the bottom-right corner
+        self.env.put_obj(Goal(), width - 2, height - 2)
+
+        # Create a vertical splitting wall
+        if self.env.determ:
+            split_idx = self.env.split_idx
+        else:
+            split_idx = self._rand_int(2, width - 2)
+        self.env.grid.vert_wall(split_idx, 0)
+
+        # Place the agent at a random position and orientation
+        # on the left side of the splitting wall
+        self.env.place_agent(size=(split_idx, height))
+        self.agent_pos = self.env.agent_pos
+        self.agent_dir = self.env.agent_dir
+
+        # Place doors and keys
+        # Warning: for Python < 3.5 dict order is non-deterministic
+        colors = COLORS.keys()
+        rand_num_gen = np.random.default_rng(self.env.seed)
+        # place_obj drops the object randomly in a rectangle
+        # put_obj puts an object in a specific place
+        for door in range(self.env.doors):
+            if self.env.determ:
+                door_idx = self.env.door_idxs[door]
+            else:
+                door_idx = rand_num_gen.choice(height - 3) + 1
+            self.env.put_obj(Door(colors[door], is_locked=True), split_idx, door_idx)
+
+        for key in range(self.env.keys):
+            if self.env.determ:
+                self.env.put_obj(Key(colors[key]), self.env.key_widths[key], self.env.key_heights[key])
+            else:
+                self.env.place_obj(obj=Key(colors[key]), top=(0, 0), size=(split_idx, height))
+
+        self.mission = "use the key to open the same color door and then get to the goal"
 

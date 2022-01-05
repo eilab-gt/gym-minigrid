@@ -3,23 +3,23 @@ from gym_minigrid.minigrid import Key, Grid, Door, Goal, COLORS
 from gym_minigrid.register import register
 import numpy as np
 
+
 class MultiDoorMultiKeyEnv(DoorKeyEnv):
     def __init__(self, size=8, doors=2, keys=2, determ=False, seed=13):
+        super().__init__(size=size)
         if (doors > (size-3)) or (keys > (size-3)):
             raise ValueError("Both doors:{} and keys:{} must be less than size-3:{}".format(doors, keys, size))
         elif doors > 6 or keys > 6:
             raise ValueError("Both doors:{} and keys:{} must be less than 6".format(doors, keys))
         self.doors = doors
         self.keys = keys
-        self.seed = seed
         self.determ = determ
         if self.determ:
-            rand_num_gen = np.random.default_rng(self.seed)
+            rand_num_gen = np.random.default_rng(seed)
             self.door_idxs = rand_num_gen.choice(size-3, size=self.doors)+1
             self.key_widths = rand_num_gen.choice(size, size=self.keys)
             self.key_heights = rand_num_gen.choice(size, size=self.keys)
             self.split_idx = rand_num_gen.integers(low=2, high=size-2)
-        super().__init__(size=16)
 
     def _gen_grid(self, width, height):
         # Create an empty grid
@@ -64,17 +64,17 @@ class MultiDoorMultiKeyEnv(DoorKeyEnv):
         self.mission = "use the key to open the same color door and then get to the goal"
 
 
-class DoorMultiKeyEnv5x5(DoorKeyEnv):
+class DoorMultiKeyEnv5x5(MultiDoorMultiKeyEnv):
     def __init__(self):
         super().__init__(size=5)
 
 
-class DoorMultiKeyEnv6x6(DoorKeyEnv):
+class DoorMultiKeyEnv6x6(MultiDoorMultiKeyEnv):
     def __init__(self):
         super().__init__(size=6)
 
 
-class DoorMultiKeyEnv16x16(DoorKeyEnv):
+class DoorMultiKeyEnv16x16(MultiDoorMultiKeyEnv):
     def __init__(self):
         super().__init__(size=16)
 

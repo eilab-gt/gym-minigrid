@@ -41,12 +41,12 @@ class DoorKeyEnv(MiniGridEnv):
             top=(0, 0),
             size=(splitIdx, height)
         )
-
-        # self.place_obj(
-        #     obj=Key('blue'),
-        #     top=(0,0),
-        #     size=(splitIdx, height)
-        # )
+        if self.second:
+            self.place_obj(
+                obj=Key('blue'),
+                top=(0,0),
+                size=(splitIdx, height)
+            )
         self.mission = "use the key to open the door and then get to the goal"
 
 class DoorKeyEnv5x5(DoorKeyEnv):

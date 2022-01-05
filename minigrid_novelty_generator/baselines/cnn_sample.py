@@ -7,6 +7,10 @@ import sys
 import gym_minigrid
 import argparse
 
+from minigrid_novelty_generator.novelty_generation.novelty_wrappers \
+    import Door2KeyNoveltyWrapper, MultiDoorMultiKeyNoveltyWrapper
+from minigrid_novelty_generator.envs import *
+
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
 from stable_baselines3.common.vec_env.vec_transpose import VecTransposeImage
@@ -23,7 +27,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', type=str, default='models/best_model.zip')
     parser.add_argument('-t','--total_timesteps', type=int, default=500000)
-    parser.add_argument('-e', '--env', type=str, default='MiniGrid-DoorKey-6x6-v0') 
+    parser.add_argument('-e', '--env', type=str, default='MiniGrid-DoorKey-6x6-v0')
     parser.add_argument('-s', '--saves_logs', type=str, default='minigrid_cnn_logs')
     parser.add_argument('--num_exp', type=int, default=1)
     return parser.parse_args()
@@ -66,83 +70,82 @@ class MinigridCNN(BaseFeaturesExtractor):
  
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.linear(self.cnn(observations))
- 
- 
-def make_env(config):
+
+     
+args = parse_args()
+  
+device = th.device('cuda' if th.cuda.is_available() else 'cpu')
+
+now = datetime.now()
+dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
+log_dir = 'logs/' + args.saves_logs + '_' + dt_string
+
+wandb_log = 'logs/wandb/' + args.saves_logs + '_' + dt_string
+
+config = {
+    "total_timesteps": 10000000,
+    "env_name": "MiniGrid-DoorKey-6x6-v0",
+    "log_dir": log_dir
+}
+
+run = wandb.init(
+    project="sb3_minigrid",
+    config=config,
+    sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    monitor_gym=True,  # auto-upload the videos of agents playing the game
+    save_code=True,  # optional
+)
+
+# env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
+
+
+def make_env():
     env = gym.make(config["env_name"])
+    env = Door2KeyNoveltyWrapper(env, novelty_episode=0)
     env = gym_minigrid.wrappers.ImgObsWrapper(env)
     env = Monitor(env, log_dir)
     obs = env.reset()
     return env
 
-     
-def main(args):
-  
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    config = {
-        "total_timesteps": 10000000,
-        "env_name": "MiniGrid-DoorKey-6x6-v0",
-    }
-    now = datetime.now()
-    dt_string = now.strftime("%d-%m-%Y_%H-%M-%S")
+env = DummyVecEnv([make_env])
+#print(env.observation_space.shape)
 
-    run = wandb.init(
-        project="sb3_minigrid",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        monitor_gym=True,  # auto-upload the videos of agents playing the game
-        save_code=True,  # optional
+eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=log_dir,
+                             log_path=log_dir, eval_freq=10000,
+                             deterministic=True, render=False)
+
+tracking_callback = WandbCallback(
+    gradient_save_freq=1000,
+    model_save_path=wandb_log,
+    model_save_freq=20,
+    verbose=2
+)
+
+all_callback = CallbackList([tracking_callback, eval_callback])
+
+policy_kwargs = dict(
+    features_extractor_class=MinigridCNN,
+    features_extractor_kwargs=dict(features_dim=128),
+)
+
+model = PPO("CnnPolicy",
+            env,
+            policy_kwargs=policy_kwargs,
+            verbose=1,
+            tensorboard_log=str(args.saves_logs),
+            device=device)
+
+if args.load:
+    print(f'loading model{args.load}')
+    # params = model_1.get_parameters()
+    model.set_parameters(args.load)
+
+for exp in range(args.num_exp):
+    model.learn(
+        total_timesteps=args.total_timesteps,
+        tb_log_name='run_{}'.format(exp)
     )
+    model.save(log_dir+'/'+'run_{}'.format(exp)+'_final_model')
 
-     
-    log_dir = 'logs/'+args.saves_logs+'_'+dt_string
-    
-    wandb_log = 'logs/wandb/'+args.saves_logs+'_'+dt_string
-    # env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
- 
-    env = DummyVecEnv([make_env(config)])
-    #print(env.observation_space.shape)
-    
-    eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=log_dir,
-                                 log_path=log_dir, eval_freq=10000,
-                                 deterministic=True, render=False)
-    
-    tracking_callback = WandbCallback(
-        gradient_save_freq=1000,
-        model_save_path=wandb_log,
-        model_save_freq = 20,
-        verbose=2)
+run.finish()
 
-    all_callback = CallbackList([tracking_callback, eval_callback])
-
-    policy_kwargs = dict(
-        features_extractor_class=MinigridCNN,
-        features_extractor_kwargs=dict(features_dim=128),
-        )
-
-    model = PPO("CnnPolicy", 
-                env, 
-                policy_kwargs=policy_kwargs, 
-                verbose=1, 
-                tensorboard_log=str(args.saves_logs), 
-                device=device)
-
-    if args.load:
-        print(f'loading model{args.load}')
-        # params = model_1.get_parameters()
-        model.set_parameters(args.load)
-    
-    for exp in range(args.num_exp):
-        model.learn(
-            total_timesteps=args.total_timesteps, 
-            tb_log_name='run_{}'.format(exp), 
-            all_callback,
-        )
-        model.save(log_dir+'/'+'run_{}'.format(exp)+'_final_model')
-    run.finish()
-
-
-if __name__ == "__main__":
-    args = parse_args()
-    main(args)
