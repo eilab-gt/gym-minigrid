@@ -58,6 +58,9 @@ class NoveltyWrapper(gym.core.Wrapper):
         obs = self.gen_obs()
         return obs
 
+    def _rand_int(self, low, high):
+        return self.env.np_random.randint(low, high)
+
     # @abc.abstractmethod
     def _post_novelty_gen_grid(self, width, height):
         """
@@ -67,9 +70,6 @@ class NoveltyWrapper(gym.core.Wrapper):
 
 
 class Door2KeyNoveltyWrapper(NoveltyWrapper):
-
-    def _rand_int(self, low, high):
-        return self.env.np_random.randint(low, high)
 
     def _post_novelty_gen_grid(self, width, height):
         # Create an empty grid
@@ -116,9 +116,6 @@ class Door2KeyNoveltyWrapper(NoveltyWrapper):
 
 class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
 
-    def _rand_int(self, low, high):
-        return self.env.np_random.randint(low, high)
-
     def _post_novelty_gen_grid(self, width, height):
         # Create an empty grid
         self.env.grid = Grid(width, height)
@@ -153,17 +150,18 @@ class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
                 door_idx = self.env.door_idxs[door]
             else:
                 door_idx = rand_num_gen.choice(height - 3) + 1
+            key_color = ((door + 1) % self.env.doors) % len(colors)
             self.env.put_obj(
-                ColorDoor(colors[door], is_locked=True, key_color=colors[(door + 1) % len(colors)]),
+                ColorDoor(colors[door], is_locked=True, key_color=key_color),
                 split_idx,
                 door_idx
             )
 
         for key in range(self.env.keys):
             if self.env.determ:
-                self.env.put_obj(Key(colors[(key + 1) % len(colors)]), self.env.key_widths[key], self.env.key_heights[key])
+                self.env.put_obj(Key(colors[key]), self.env.key_widths[key], self.env.key_heights[key])
             else:
-                self.env.place_obj(obj=Key(colors[(key + 1) % len(colors)]), top=(0, 0), size=(split_idx, height))
+                self.env.place_obj(obj=Key(colors[key]), top=(0, 0), size=(split_idx, height))
 
         self.mission = "use different color keys to open doors and then get to the goal"
 
