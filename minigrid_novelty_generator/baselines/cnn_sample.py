@@ -21,11 +21,10 @@ import wandb
 from wandb.integration.sb3 import WandbCallback
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--load', type=str, default='models/best_model.zip')
-    parser.add_argument('-t','--total_timesteps', type=int, default=500000)
+    parser.add_argument('-t', '--total_timesteps', type=int, default=500000)
     parser.add_argument('-e', '--env', type=str, default='MiniGrid-DoorKey-6x6-v0')
     parser.add_argument('-s', '--saves_logs', type=str, default='minigrid_cnn_logs')
     parser.add_argument('--num_exp', type=int, default=1)
@@ -39,6 +38,7 @@ class MinigridCNN(BaseFeaturesExtractor):
     :param features_dim: Number of features extracted.
         This corresponds to the number of unit for the last layer.
     """
+
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 64):
         super().__init__(observation_space, features_dim)
         # We assume CxHxW images (channels first)
@@ -61,18 +61,18 @@ class MinigridCNN(BaseFeaturesExtractor):
             ).shape[1]
 
         self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
- 	
-        #n = observation_space.shape[1]
-        #m = observation_space.shape[2]
-        #self.image_embedding_size = ((n-1)//2-2)*((m-1)//2-2)*final_dim
-        #self.linear = nn.Sequential(nn.Linear(self.image_embedding_size, features_dim), nn.ReLU())
- 
+
+        # n = observation_space.shape[1]
+        # m = observation_space.shape[2]
+        # self.image_embedding_size = ((n-1)//2-2)*((m-1)//2-2)*final_dim
+        # self.linear = nn.Sequential(nn.Linear(self.image_embedding_size, features_dim), nn.ReLU())
+
     def forward(self, observations: th.Tensor) -> th.Tensor:
         return self.linear(self.cnn(observations))
 
-     
+
 args = parse_args()
-  
+
 device = th.device('cuda' if th.cuda.is_available() else 'cpu')
 
 now = datetime.now()
@@ -95,7 +95,6 @@ run = wandb.init(
     save_code=True,  # optional
 )
 
-# env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
 
 def make_env():
     env = gym.make(config["env_name"])
@@ -105,8 +104,8 @@ def make_env():
     obs = env.reset()
     return env
 
+
 env = DummyVecEnv([make_env])
-#print(env.observation_space.shape)
 
 eval_callback = EvalCallback(VecTransposeImage(env), best_model_save_path=log_dir,
                              log_path=log_dir, eval_freq=10000,
@@ -143,7 +142,6 @@ for exp in range(args.num_exp):
         total_timesteps=args.total_timesteps,
         tb_log_name='run_{}'.format(exp)
     )
-    model.save(log_dir+'/'+'run_{}'.format(exp)+'_final_model')
+    model.save(log_dir + '/' + 'run_{}'.format(exp) + '_final_model')
 
 run.finish()
-
