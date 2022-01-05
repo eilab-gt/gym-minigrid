@@ -9,7 +9,6 @@ import argparse
 
 from minigrid_novelty_generator.novelty_generation.novelty_wrappers \
     import Door2KeyNoveltyWrapper, MultiDoorMultiKeyNoveltyWrapper
-from minigrid_novelty_generator.envs import *
 
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder
@@ -84,7 +83,7 @@ wandb_log = 'logs/wandb/' + args.saves_logs + '_' + dt_string
 
 config = {
     "total_timesteps": 10000000,
-    "env_name": "MiniGrid-DoorKey-6x6-v0",
+    "env_name": "MiniGrid-DoorMultiKey-6x6-v0",
     "log_dir": log_dir
 }
 
@@ -98,10 +97,9 @@ run = wandb.init(
 
 # env = DummyVecEnv([lambda: Monitor(CustomEnv(reward_func=FUNCTION), log_dir, allow_early_resets=True) for _ in range(num_cpu)])
 
-
 def make_env():
     env = gym.make(config["env_name"])
-    env = Door2KeyNoveltyWrapper(env, novelty_episode=0)
+    env = MultiDoorMultiKeyNoveltyWrapper(env, novelty_episode=0)
     env = gym_minigrid.wrappers.ImgObsWrapper(env)
     env = Monitor(env, log_dir)
     obs = env.reset()

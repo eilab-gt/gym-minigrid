@@ -1,12 +1,10 @@
-from gym_minigrid.envs.doorkey import DoorKeyEnv
-from gym_minigrid.minigrid import Key, Grid, Door, Goal, COLORS
+from gym_minigrid.minigrid import *
 from gym_minigrid.register import register
 import numpy as np
 
 
-class MultiDoorMultiKeyEnv(DoorKeyEnv):
+class MultiDoorMultiKeyEnv(MiniGridEnv):
     def __init__(self, size=8, doors=2, keys=2, determ=False, seed=13):
-        super().__init__(size=size)
         if (doors > (size-3)) or (keys > (size-3)):
             raise ValueError("Both doors:{} and keys:{} must be less than size-3:{}".format(doors, keys, size))
         elif doors > 6 or keys > 6:
@@ -14,12 +12,17 @@ class MultiDoorMultiKeyEnv(DoorKeyEnv):
         self.doors = doors
         self.keys = keys
         self.determ = determ
+        self.seed_value = seed
         if self.determ:
-            rand_num_gen = np.random.default_rng(seed)
+            rand_num_gen = np.random.default_rng(self.seed_value)
             self.door_idxs = rand_num_gen.choice(size-3, size=self.doors)+1
             self.key_widths = rand_num_gen.choice(size, size=self.keys)
             self.key_heights = rand_num_gen.choice(size, size=self.keys)
             self.split_idx = rand_num_gen.integers(low=2, high=size-2)
+        super().__init__(
+            grid_size=size,
+            max_steps=10 * size * size
+        )
 
     def _gen_grid(self, width, height):
         # Create an empty grid
@@ -44,8 +47,8 @@ class MultiDoorMultiKeyEnv(DoorKeyEnv):
 
         ## Place doors and keys
         ## Warning: for Python < 3.5 dict order is non-deterministic
-        colors = COLORS.keys()
-        rand_num_gen = np.random.default_rng(self.seed)
+        colors = list(COLORS.keys())
+        rand_num_gen = np.random.default_rng(self.seed_value)
         # place_obj drops the object randomly in a rectangle
         # put_obj puts an object in a specific place
         for door in range(self.doors):

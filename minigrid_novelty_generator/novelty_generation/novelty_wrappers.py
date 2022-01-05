@@ -2,6 +2,7 @@
 # you should be able to specify the exact novelty AND that there should be a random novelty
 import abc
 import gym
+import numpy as np
 
 from .novelty_objs import ColorDoor
 from gym_minigrid.minigrid import Key, Grid, Door, Goal, COLORS
@@ -110,7 +111,7 @@ class Door2KeyNoveltyWrapper(NoveltyWrapper):
                 top=(0, 0),
                 size=(splitIdx, height)
             )
-        self.env.mission = "use the key to open the door and then get to the goal"
+        self.env.mission = "use different color key to open the door and then get to the goal"
 
 
 class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
@@ -143,8 +144,8 @@ class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
 
         # Place doors and keys
         # Warning: for Python < 3.5 dict order is non-deterministic
-        colors = COLORS.keys()
-        rand_num_gen = np.random.default_rng(self.env.seed)
+        colors = list(COLORS.keys())
+        rand_num_gen = np.random.default_rng(self.env.seed_value)
         # place_obj drops the object randomly in a rectangle
         # put_obj puts an object in a specific place
         for door in range(self.env.doors):
@@ -152,13 +153,17 @@ class MultiDoorMultiKeyNoveltyWrapper(NoveltyWrapper):
                 door_idx = self.env.door_idxs[door]
             else:
                 door_idx = rand_num_gen.choice(height - 3) + 1
-            self.env.put_obj(Door(colors[door], is_locked=True), split_idx, door_idx)
+            self.env.put_obj(
+                ColorDoor(colors[door], is_locked=True, key_color=colors[(door + 1) % len(colors)]),
+                split_idx,
+                door_idx
+            )
 
         for key in range(self.env.keys):
             if self.env.determ:
-                self.env.put_obj(Key(colors[key]), self.env.key_widths[key], self.env.key_heights[key])
+                self.env.put_obj(Key(colors[(key + 1) % len(colors)]), self.env.key_widths[key], self.env.key_heights[key])
             else:
-                self.env.place_obj(obj=Key(colors[key]), top=(0, 0), size=(split_idx, height))
+                self.env.place_obj(obj=Key(colors[(key + 1) % len(colors)]), top=(0, 0), size=(split_idx, height))
 
-        self.mission = "use the key to open the same color door and then get to the goal"
+        self.mission = "use different color keys to open doors and then get to the goal"
 
